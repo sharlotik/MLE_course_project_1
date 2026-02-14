@@ -1,92 +1,62 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
-from typing import Dict, List, TYPE_CHECKING
-import models.user
-import uvicorn
-import logging
-from dataclasses import dataclass, field
-from decimal import Decimal
-from pathlib import Path
-from typing import Optional
-from datetime import datetime
-
-
-#if TYPE_CHECKING:
-from models.user import User
+from database.config import get_settings
+from database.database import get_session, init_db, get_database_engine
+from services.crud.user import get_all_users, create_user
+from sqlmodel import Session
 from models.event import Event
-from models.model import Model
+from models.user import User
+import hashlib
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title="Сервисное API",
-    description="API для управления событиями",
-    version="1.0.0"
-)
-#app.state.model = getmodel()
-@app.get("/", response_model=Dict[str, str])
-#async def index(request: Request) -> Dict[str, str]:
-async def index() -> Dict[str, str]:
-    """
-    Корневой эндпоинт, возвращающий приветственное сообщение с информацией о пользователе.
+if __name__ == "__main__":
+    settings = get_settings()
+    print(settings.APP_NAME)
+    print(settings.API_VERSION)
+    print(f'Debug: {settings.DEBUG}')
     
-    Returns:
-        Dict[str, str]: Приветственное сообщение с информацией о пользователе
-    """
-    try:
-       # model = request.app.state.model
-        user = User(id=1, email="Nick@gmail.com", password="12345678",
-        balance = 0.00) 
-        event = Event(
-            id=1,
-            title="Вызов модели",
-            image="image.jpg",
-            description="Вызов модели",
-            creator=user          
-        )
-        user.add_event(event)
-        logger.info(f"Успешное выполнение маршрута index для пользователя: {user}")
-        # event.action(ml_model)
-        #print(f"Created user: {user}")
-        #print(f"Number of user events: {len(user.events)}")
-        return {"message": f"Hello! User: {user}"}
-    except Exception as e:
-        logger.error(f"Ошибка в маршруте index: {str(e)}")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+    print(settings.DB_HOST)
+    print(settings.DB_NAME)
+    print(settings.DB_USER)
+    
+    init_db(drop_all=True)
+    print('Init db has been success')
+    
+    test_user_1 = User(id=1, email="Nick@gmail.com",
+                    password_hash=hashlib.sha256("password123".encode()).hexdigest())
+    test_user_2 = User(id=2, email="Peter@gmail.com",    
+                    password_hash=hashlib.sha256("password456".encode()).hexdigest())
+    test_user_3 = User(id=3, email="birdwatcher@gmail.com", 
+                    password_hash=hashlib.sha256("password789".encode()).hexdigest())
 
+           
+    test_event_1 = Event(id = 1, title='test', image='test', description='test', 
+                        creator = test_user_1)
+    test_event_2 = Event(id = 2, title='test', image='test', description='test', 
+                        creator = test_user_2)
+    
+    test_user_1.events.append(test_event_1)
+    test_user_2.events.append(test_event_2)
+    
+    engine = get_database_engine()
+    
+    with Session(engine) as session:
+        create_user(test_user_1, session)
+        create_user(test_user_2, session)
+        create_user(test_user_3, session)
+        users = get_all_users(session)
         
+    print('-------')
+    print(f'Id локального пользователя: {id(test_user_1)}')
+    print(f'Id пользователя из БД: {id(users[0])}')
+    print(f'Id одинаковые: {id(test_user_1) == id(users[0])}')
 
-@app.get("/health")
-async def health_check() -> Dict[str, str]:
-    """
-    Эндпоинт проверки работоспособности для мониторинга.
-    
-    Returns:
-        Dict[str, str]: Сообщение о статусе
-    """
-    logger.info("Эндпоинт health_check успешно вызван")
-    return {"status": "healthy"}
-
-# Обработчики ошибок
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    logger.warning(f"HTTPException: {exc.detail} для запроса {request.url}")
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail}
-    )
-
-if __name__ == '__main__':
-    uvicorn.run(
-        'main:app',
-        host='0.0.0.0',
-        port=8080,
-        reload=True,
-        log_level="debug"
-    )
+    print('-------')
+    print('Пользователи из БД:')        
+    for user in users:
+        print(user)
+        print('Пользовательские события:')
+        if user.event_count == 0:
+            print('Пользователь не имеет событий')
+        else:
+            for event in user.events:
+                print(event)
 
