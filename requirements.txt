@@ -1,0 +1,12 @@
+sqlalchemy
+asyncpg
+psycopg
+psycopg-binary
+alembic
+pydantic
+pydantic-settings
+sqlmodel
+starlette
+Pillow
+torch
+transformers
