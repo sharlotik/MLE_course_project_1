@@ -49,7 +49,7 @@ async def signup(data: User, session=Depends(get_session)) -> Dict[str, str]:
         logger.error(f"Error during signup: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error creating user"
+            detail=f"Error creating user  {str(e)}" 
         )
 
 @user_route.post('/signin')
@@ -104,3 +104,34 @@ async def get_all_users(session=Depends(get_session)) -> List[User]:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error retrieving users"
         )
+
+
+@user_route.get("/user/{user_id}", response_model=User) 
+async def get_user_by_id(user_id: int, session=Depends(get_session)) -> User:
+    try:
+        user = UserService.get_user_by_id(user_id, session)
+    except Exception as e:
+        logger.error(f"Database error: {str(e)}")   
+    if not user:
+        logger.warning(f"User {user_id} not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="User_ID doesn't exist"
+        )
+    logger.info(f"Retrieved user {user_id}")
+    return user   
+
+@user_route.get("/email/{email}", response_model=User) 
+async def get_user_by_email(email: str, session=Depends(get_session)) -> User:
+    try:
+        user = UserService.get_user_by_email(email, session)
+    except Exception as e:
+        logger.error(f"Database error: {str(e)}")   
+    if not user:
+        logger.warning(f"User with email {email} not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="User with this email doesn't exist"
+        )
+    logger.info(f"Retrieved user with email {email}")
+    return user   

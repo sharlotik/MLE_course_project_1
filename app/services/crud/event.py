@@ -1,7 +1,11 @@
-from models.event import Event, EventUpdate
+from models.event import Event, EventUpdate, EventBase, EventCreate
+from models.model import Model
+from models.wallet import Wallet 
+from models.transaction import Transaction
 from sqlmodel import Session, select
 from typing import List, Optional
 from datetime import datetime
+from decimal import Decimal
 
 def get_all_events(session: Session) -> List[Event]:
     """
@@ -67,26 +71,44 @@ def update_event(event_id: int, event_update: EventUpdate, session: Session) -> 
         session.rollback()
         raise
 
-def create_event(event: Event, session: Session) -> Event:
+def create_event(event_data: EventCreate, creator_id: int, 
+                    model : Model, session: Session) -> Event:
     """
     Create new event.
     
     Args:
-        event: Event to create
+        event_data: Input data for event
         session: Database session
     
     Returns:
         Event: Created event with ID
     """
+    predict = model.predict(input_data = event_data.image)
+    event = Event(
+        **event_data.model_dump(), 
+        prediction = predict,      
+        creator_id=creator_id       
+    )
     try:
-        session.add(event)
+        statement = select(Wallet).where(Wallet.user_id == creator_id)
+        wallet = session.exec(statement).one()  
+
+        transaction = Transaction(
+            user_id=creator_id,
+            txn_type='Service',
+            amount=Decimal("0.01") 
+        )
+        transaction.execute(wallet)
+        session.add_all([transaction, event, wallet])
         session.commit()
-        session.refresh(event)
+        session.refresh(event, attribute_names=["prediction", "creator_id", "creator"])
         return event
     except Exception as e:
         session.rollback()
         raise
-    
+  
+
+
 def delete_all_events(session: Session) -> int:
     """
     Delete all events.

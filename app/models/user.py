@@ -25,7 +25,7 @@ class User(SQLModel, table=True):
         min_length=5,
         max_length=255
     )
-    password_hash: str = Field(..., min_length=4) 
+    password: str = Field(..., min_length=4) 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     events: List["Event"] = Relationship(
         back_populates="creator",
@@ -52,38 +52,6 @@ class User(SQLModel, table=True):
         if not pattern.match(self.email):
             raise ValueError("Invalid email format")
         return True
-
-    def __post_init__(self, password : str) -> None:
-        self._validate_email()
-        self.password_hash = self._validate_password(password)
-        
-    def _validate_email(self) -> None:
-        """Проверяет корректность email."""
-        email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-        if not email_pattern.match(self.email):
-            raise ValueError("Invalid email format")
-
-    def _validate_password(self, password : str) -> str:
-        """Проверяет минимальную длину пароля."""
-        if len(password) < 8:
-            raise ValueError("Password must be at least 8 characters long")
-        return hashlib.sha256(password.encode()).hexdigest()
-        
-    def check_password(self, password: str) -> bool:
-        """Проверка соответствия пароля."""
-        return self.password_hash == hashlib.sha256(password.encode()).hexdigest()
-
-    def add_event(self, event: 'Event') -> None:
-        """Добавляет событие в список событий пользователя."""
-        self.events.append(event)  
-        
- #   def show_history(self):
-  #      print("История запросов к модели:")
-   #     for idx, evnt in enumerate(self.events):
-    #        if evnt.title == 'Вызов модели':
-     #           print(f"{idx+1}. [{evnt.report_dttm.strftime('%Y-%m-%d %H:%M')}] Файл: {evnt.image},
-      #           Результат: {evnt.result}, Изменение баланса: {evnt.amount}")
-
     
     @property
     def event_count(self) -> int:
@@ -94,3 +62,46 @@ class User(SQLModel, table=True):
         """Model configuration"""
         validate_assignment = True
         arbitrary_types_allowed = True
+
+'''
+class Admin(User, table=True):
+    """
+    Класс администратора (наследование от User).
+   
+    Attributes:
+        id (int): id пользователя
+        role (str): Роль пользователя
+        admin_logs: Логи администратора
+    
+    """
+    id: Optional[int] = Field(
+        primary_key=True, 
+        foreign_key="user.id"
+    )
+    role: str = Field(default="admin") #, init=False
+    admin_logs: List[str] = Field(default_factory=list) #, init=False
+    
+'''
+'''
+    def log_action(self, action: str):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.admin_logs.append(f"[{timestamp}] Admin ID {self.id}: {action}")
+
+    def delete_user(self, user: User) -> None:
+        self.log_action(f"Deleted user {user.id}")
+        print(f"User {user.email} removed.")
+        
+        
+    def change_user_balance(self, user: User, amount: Decimal, billing : BillingService, transaction : Transaction) -> None:
+
+        if amount <= 0:
+            raise ValueError("Сумма пополнения должна быть положительной")
+
+        user.wallet.balance += amount
+        billing.execute_transaction(user, amount, 'Deposit')
+        new_txn = transaction(txn_type = "Deposit (Admin)", amount = amount)
+        user.wallet.history.append(new_txn)
+  
+        self.log_action(f"Deposited {amount} to User ID {user.id}")
+        print(f"Баланс пользователя {user.email} пополнен на {amount}. Текущий баланс: {user.wallet.balance}")
+        '''

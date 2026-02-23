@@ -1,14 +1,22 @@
 from fastapi import APIRouter, Body, HTTPException, status, Depends
 from database.database import get_session
-from models.transaction import Transaction 
+from models.wallet import Wallet
+from services.crud import wallet as WalletService
+from decimal import Decimal
 from typing import List
 
 wallet_router = APIRouter()
-wallets = []
 
-@wallet_router.get("/", response_model=List[Transaction]) 
-async def retrieve_all_wallets() -> List[Transaction]:
-    return transaction
+@wallet_router.get("/{user_id}", response_model=Decimal) 
+async def retrieve_wallet(user_id : int, session=Depends(get_session)):
+  balance = WalletService.get_balance_by_user_id(user_id, session)    
+  if balance is None:
+      raise HTTPException(
+          status_code=status.HTTP_404_NOT_FOUND,
+          detail=f"Wallet for user {user_id} not found"
+      )
+  
+  return balance
 
 #@wallet_router.get("/{id}", response_model=Transaction) 
 #async def retrieve_wallet(id: int) -> Transaction:

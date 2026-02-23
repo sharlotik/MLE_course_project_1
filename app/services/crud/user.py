@@ -1,8 +1,10 @@
 from models.user import User
 from models.event import Event
+from models.wallet import Wallet
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
+
 
 def get_all_users(session: Session) -> List[User]:
     """
@@ -76,6 +78,9 @@ def create_user(user: User, session: Session) -> User:
     """
     try:
         session.add(user)
+        session.flush()
+        wallet = Wallet(user_id=user.id, balance="0.00")
+        session.add(wallet)
         session.commit()
         session.refresh(user)
         return user
